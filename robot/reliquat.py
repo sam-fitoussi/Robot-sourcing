@@ -4,9 +4,12 @@ Produit d'un coup tout ce que les étapes 3 à 6 du RUNBOOK consomment,
 sans aucune jointure ni parsing à la main :
 
   reliquat_a_chercher.jsonl  fiches « À chercher » des runs précédents,
-                             avec `urls_exclues` (homonymes déjà écartés)
-                             et `indices` (indices greffe posés par run.py),
-                             tous deux extraits de « Détail score »
+                             avec `urls_exclues` (homonymes déjà écartés),
+                             `urls_perimees` (adresses LinkedIn de la BONNE
+                             personne devenues illisibles : chercher son
+                             profil actuel, pas un autre candidat) et
+                             `indices` (indices greffe posés par run.py),
+                             tous extraits de « Détail score »
   reliquat_scrape.jsonl      {rec_id, url} : fiches Trouvé/Ambigu avec URL
                              mais SANS Score (le scraping n'a pas abouti)
   contexte.jsonl             contexte de toutes ces fiches (nom, âge,
@@ -92,7 +95,10 @@ def main(sortie_dir: str, fichiers_jour: list[str]) -> None:
                 "siren": f.get(CF["siren_cible"]), "indices": indices}
         if statut == "À chercher":
             urls = re.findall(r"https?://[^\s)|]+", detail)
-            a_chercher.append(base | {"urls_exclues": urls})
+            perimees = [u for seg in detail.split(" | ") if "URL périmée" in seg
+                        for u in re.findall(r"https?://[^\s)|]+", seg)]
+            a_chercher.append(base | {"urls_exclues": urls}
+                              | ({"urls_perimees": perimees} if perimees else {}))
         elif statut in ("Trouvé", "Ambigu") and f.get(CF["linkedin_url"]) \
                 and f.get(CF["score"]) is None:  # Score rempli (même 0) = déjà traité
             a_scraper.append({"rec_id": r["id"], "url": f[CF["linkedin_url"]]})
@@ -108,7 +114,7 @@ def main(sortie_dir: str, fichiers_jour: list[str]) -> None:
     # contexte.jsonl inclut AUSSI les « À chercher » : re-cherchés puis
     # scrapés dans le même run, ils arrivent au contrôle d'identité et à
     # la Note IA — sans leur contexte, le juge recevrait un greffe vide
-    ctx_a_chercher = [{k: v for k, v in x.items() if k != "urls_exclues"}
+    ctx_a_chercher = [{k: v for k, v in x.items() if k not in ("urls_exclues", "urls_perimees")}
                       for x in a_chercher]
     contexte = ctx_reliquat + ctx_a_chercher + lignes_jour
     ecrire("contexte.jsonl", contexte)

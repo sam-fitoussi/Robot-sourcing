@@ -75,11 +75,11 @@ def main(dossier: str) -> None:
           + (f" ({detail_jour})" if detail_jour else " (aucune date tirée)"))
     print(f"Reliquat repris : {len(reliquat_ac)} à re-chercher, "
           f"{len(reliquat_sc)} à re-scraper")
-    st = {"ok": 0, "vide": 0, "mort": 0, "erreur": 0}
+    st = {"ok": 0, "vide": 0, "perimee": 0, "mort": 0, "erreur": 0}
     for r in resultats:
         st[r["statut"]] = st.get(r["statut"], 0) + 1
     print(f"Scrapés : {len(resultats)} — ok {st['ok']}, vides {st['vide']}, "
-          f"morts {st['mort']}, erreurs {st['erreur']}")
+          f"adresses périmées {st['perimee']}, morts {st['mort']}, erreurs {st['erreur']}")
     n_confirmes = sum(1 for v in verif if v["verdict"] == "ok" and not v.get("non_verifie"))
     n_nv = sum(1 for v in verif if v.get("non_verifie"))
     n_mauvais = sum(1 for v in verif if v["verdict"] == "mauvais")
@@ -167,13 +167,17 @@ def main(dossier: str) -> None:
                 f"- Écartement requalifié par le garde-fou : {nom_de(v['rec_id'])} "
                 f"({v.get('url')}) — {v.get('raison')} — passé au scoring, mention dans Détail")
     for r in resultats:
-        if r["statut"] == "vide":
-            f = maj_ix.get(r["rec_id"], {})
-            terminal = "2e scrape vide" in (f.get(CF["detail"]) or "")
-            lignes_anomalies.append(
-                f"- Scrape vide : {nom_de(r['rec_id'])} ({r.get('url')}) — "
-                + ("2e fois, URL traitée comme morte" if terminal
-                   else "échec technique, re-scrape au prochain run"))
+        if r["statut"] in ("vide", "perimee"):
+            st_maj = maj_ix.get(r["rec_id"], {}).get(CF["statut"])
+            if st_maj == "Non trouvé":
+                suite = "2e adresse périmée : recherche ABANDONNÉE"
+            elif st_maj == "À chercher":
+                suite = ("adresse LinkedIn périmée (même personne, adresse changée) — "
+                         "re-recherche de son profil actuel au prochain run")
+            else:
+                suite = "scrape vide (1re fois) — re-scrape au prochain run"
+            label = "URL périmée" if r["statut"] == "perimee" else "Scrape vide"
+            lignes_anomalies.append(f"- {label} : {nom_de(r['rec_id'])} ({r.get('url')}) — {suite}")
         elif r["statut"] == "erreur":
             lignes_anomalies.append(
                 f"- Erreur de scraping : {nom_de(r['rec_id'])} ({r.get('url')}) — "

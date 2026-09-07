@@ -11,13 +11,18 @@ Reprise : relancer avec le MÊME préfixe de sortie (un préfixe par jour).
 Les rec_id déjà présents dans <sortie>.jsonl sont sautés et comptent dans
 le plafond — le cap (config.SCRAPE_DAILY_CAP) est donc bien quotidien,
 pas par invocation.
-Une URL morte (404 / résultat vide) sort en statut "mort" : le RUNBOOK
+Une URL morte (aucun résultat) sort en statut "mort" : le RUNBOOK
 demande alors « Non trouvé » + Anomalie (fait par robot/scorer_lot.py).
+Un profil que PhantomBuster déclare introuvable (« No Linkedin profile
+found ») sort en statut "perimee" : l'adresse LinkedIn a changé (LinkedIn
+ne redirige pas les anciennes adresses personnalisées, mais l'index de
+recherche les garde en cache) — re-scraper ne sert à rien, il faut
+retrouver l'adresse actuelle de la MÊME personne (robot/verif_identite.py
+renvoie la fiche en « À chercher », adresse exclue).
 Un objet renvoyé mais SANS contenu exploitable (moins de 2 des champs
 utiles remplis — un compteur à zéro compte comme vide, cf.
-config.champs_remplis) sort en statut "vide" : c'est un échec technique, pas une
-information sur l'URL — robot/verif_identite.py le laisse sans score pour
-un re-scrape au run suivant, et le traite comme URL morte au 2e vide.
+config.champs_remplis) sort en statut "vide" : re-scrapé une fois au run
+suivant, puis traité comme une adresse périmée.
 
 Usage :
     python3 -m robot.scraping_lot file.jsonl resultats [cap]
@@ -54,7 +59,10 @@ def scraper_file(fichier_file: str, prefixe_sortie: str, cap: int = config.SCRAP
             profil = phantoms.scraper_profil(t["url"])
             p = profil[0] if isinstance(profil, list) and profil else profil
             if not p:
-                ligne["statut"] = "mort"  # URL 404 ou profil vide
+                ligne["statut"] = "mort"  # aucun résultat
+            elif "no linkedin profile found" in str(p.get("error") or "").lower():
+                ligne["statut"] = "perimee"  # adresse LinkedIn changée : à re-chercher
+                ligne["profil"] = p
             elif config.champs_remplis(p) < 2:
                 ligne["statut"] = "vide"  # objet renvoyé mais sans contenu : échec technique
                 ligne["profil"] = p

@@ -161,7 +161,11 @@ docs/REVUE.md) : le robot de 6h05 ne la lit ni ne l'écrit.
    étape reprend D'ABORD ce que la précédente n'a pas fini, en le lisant
    dans Airtable. Ici : commencer par `reliquat_a_chercher.jsonl`
    (produit à l'étape 2 — le champ `urls_exclues` liste les homonymes
-   déjà écartés, à EXCLURE des candidats), puis traiter les fondateurs du
+   déjà écartés, à EXCLURE des candidats ; le champ `urls_perimees`, s'il
+   est là, liste des adresses de la BONNE personne devenues illisibles :
+   l'identité est acquise, chercher son profil ACTUEL — même nom, même
+   société ou poste dans les résultats — et non un autre candidat), puis
+   traiter les fondateurs du
    jour (`*_fondateurs.jsonl`). Chaque ligne porte `indices` : les
    signaux d'identité gratuits du tirage Pappers — `naissance`
    (AAAA-MM), `ville_dirigeant` (le domicile PERSONNEL du dirigeant,
@@ -285,11 +289,13 @@ docs/REVUE.md) : le robot de 6h05 ne la lit ni ne l'écrit.
    pour retrouver l'avancement après une compaction — le consulter au
    plus une fois par tranche de ~10 minutes.
    Lire `resultats.jsonl` une seule fois à la fin.
-   Un profil renvoyé SANS contenu exploitable sort
-   en statut « vide » : échec technique, pas une information sur l'URL —
-   le script de l'étape 5 le marque dans Détail et le laisse sans score
-   (re-scrapé au run suivant via le reliquat) ; au 2e scrape vide il est
-   traité comme URL morte. Rien à faire à la main.
+   Un profil que PhantomBuster déclare introuvable sort en statut
+   « perimee » : la personne a changé d'adresse LinkedIn (LinkedIn ne
+   redirige pas les anciennes adresses, l'index de recherche les garde
+   en cache) — l'étape 5 renvoie la fiche en « À chercher », adresse
+   exclue, pour retrouver le profil ACTUEL de la même personne. Un
+   profil renvoyé quasi vide sort en « vide » : re-scrapé une fois au
+   run suivant, puis même traitement. Rien à faire à la main.
    Plafond strict : 300 profils/jour (config.SCRAPE_DAILY_CAP —
    PhantomBuster annonce 1000-1500/jour sans risque, on garde une marge
    x3-5 car le compte LinkedIn est partagé), appliqué par le script. À
@@ -343,7 +349,8 @@ docs/REVUE.md) : le robot de 6h05 ne la lit ni ne l'écrit.
    `python3 -m robot.airtable maj tblBngzHytB48MiDK /tmp/run_du_jour/verif_maj.json` :
    homonymes écartés (retour en « À chercher » + Anomalie + URL exclue
    dans Détail ; au 2e homonyme écarté sur la même fiche, le script la
-   passe en « Non trouvé » définitif — pas de boucle) et profils non
+   passe en « Non trouvé » définitif — pas de boucle), adresses périmées
+   (même retour en « À chercher », cf. étape 4) et profils non
    vérifiés pour cause d'API indisponible (ils passent au scoring mais
    Anomalie est cochée : à signaler dans le rapport, jamais en silence).
 

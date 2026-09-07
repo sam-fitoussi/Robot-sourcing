@@ -31,9 +31,16 @@ Verdicts :
   - vérification indisponible (API en panne) → le profil passe quand même
     (on ne bloque pas le pipeline) mais Anomalie est cochée : le trou est
     visible, jamais silencieux.
+  - statut "perimee" (PhantomBuster : « No Linkedin profile found ») → la
+    personne a changé d'adresse LinkedIn : retour en « À chercher »,
+    adresse exclue, marqueur « URL périmée » dans Détail — la recherche
+    suivante cherche le profil ACTUEL de la même personne (l'identité est
+    acquise). Au 2e épisode sur la même fiche : « Non trouvé » définitif.
   - statut "vide" (scrape sans aucun champ utile) → jamais scoré : marqueur
     « Scrape vide » dans Détail et re-scrape au run suivant via le
-    reliquat ; au 2e vide, URL traitée comme morte (Non trouvé + Anomalie).
+    reliquat ; au 2e vide de la même adresse, même traitement que
+    "perimee". Une identité trouvée n'est jamais enterrée sur un simple
+    échec de lecture.
 Le juge reçoit aussi les cofondateurs de la même société (greffe + extrait
 de leur profil scrapé) : le recoupement d'équipe vaut aussi au contrôle.
 Ce contexte d'équipe est un INSTANTANÉ pris avant tout verdict : une fiche
@@ -259,30 +266,51 @@ def main(f_resultats: str, f_contexte: str, prefixe: str) -> None:
     # Sorties : profils validés -> scoring ; écartés -> retour en recherche
     aujourd_hui = dt.date.today().strftime("%d/%m")
     maj = []
-    vides = vides_termines = 0
+    vides = perimees = abandons = 0
     with open(f"{prefixe}_ok.jsonl", "w") as ok_out:
         for ligne in resultats:
             v = verdicts.get(ligne["rec_id"])
-            if ligne.get("statut") == "vide":
-                # Échec technique, pas une information sur l'URL : jamais scoré.
-                # 1re fois : marqueur durable + re-scrape au run suivant (reliquat) ;
-                # 2e fois : on arrête, traité comme URL morte.
-                deja = fiches.get(ligne["rec_id"], {}).get(CF["detail"]) or ""
-                if "Scrape vide" in deja:
-                    vides_termines += 1
+            statut, url = ligne.get("statut"), ligne.get("url")
+            deja = fiches.get(ligne["rec_id"], {}).get(CF["detail"]) or ""
+            deja_vide_ici = any("Scrape vide" in seg and (url or "") in seg
+                                for seg in deja.split(" | "))
+            if statut == "vide" and not deja_vide_ici:
+                # 1er scrape vide de CETTE adresse : marqueur + re-scrape au
+                # run suivant (reliquat), jamais scoré
+                vides += 1
+                maj.append({"id": ligne["rec_id"], "fields": {
+                    CF["detail"]: (deja + " | " if deja else "")
+                    + f"Scrape vide le {aujourd_hui} ({url}) — re-scrape au prochain run.",
+                }})
+                continue
+            if statut in ("vide", "perimee"):
+                # Adresse LinkedIn périmée (PhantomBuster ne trouve plus ce
+                # profil) ou 2e scrape vide de la même adresse : l'identité est
+                # acquise, seule l'adresse est illisible — retour en « À
+                # chercher » pour retrouver le profil ACTUEL de la même
+                # personne, adresse exclue. Anti-boucle : au 2e épisode sur la
+                # même fiche, abandon.
+                motif = ("PhantomBuster ne trouve plus ce profil" if statut == "perimee"
+                         else "2e scrape vide")
+                message = ((deja + " | " if deja else "")
+                           + f"URL périmée le {aujourd_hui} ({url}) : {motif} — même "
+                             "personne, adresse changée : chercher son profil actuel.")
+                if "URL périmée" in deja:
+                    abandons += 1
                     maj.append({"id": ligne["rec_id"], "fields": {
                         CF["statut"]: "Non trouvé",
+                        CF["linkedin_url"]: "",
                         CF["anomalie"]: True,
                         CF["score"]: 0,
-                        CF["detail"]: deja + f" | 2e scrape vide le {aujourd_hui} : "
-                                             "URL traitée comme morte.",
+                        CF["detail"]: message + " 2e adresse périmée : abandon de la recherche.",
                     }})
                 else:
-                    vides += 1
+                    perimees += 1
                     maj.append({"id": ligne["rec_id"], "fields": {
-                        CF["detail"]: (deja + " | " if deja else "")
-                        + f"Scrape vide le {aujourd_hui} (aucun champ utile) — "
-                          "re-scrape au prochain run.",
+                        CF["statut"]: "À chercher",
+                        CF["linkedin_url"]: "",
+                        CF["anomalie"]: True,
+                        CF["detail"]: message,
                     }})
                 continue
             if v and v["verdict"] == "mauvais":
@@ -330,7 +358,8 @@ def main(f_resultats: str, f_contexte: str, prefixe: str) -> None:
     print(f"{n_ok} profils confirmés, {n_mauvais} homonymes écartés"
           + (f" ({n_req} écartement(s) requalifié(s) par le garde-fou)" if n_req else "") + ", "
           f"{n_nv} non vérifiés (Anomalie cochée), {vides} scrapes vides à "
-          f"reprendre demain, {vides_termines} traités en URL morte (2e vide).")
+          f"reprendre demain, {perimees} adresses périmées renvoyées en recherche, "
+          f"{abandons} abandons (2e adresse périmée).")
 
 
 if __name__ == "__main__":
