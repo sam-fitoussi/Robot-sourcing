@@ -88,12 +88,16 @@ même société rare) est une corroboration forte de l'identité.
 Réponds "mauvais" UNIQUEMENT sur une CONTRADICTION POSITIVE d'identité :
 - âge ou naissance impossibles au vu des dates du profil (études, carrière) ; OU
 - le profil établit manifestement une AUTRE personne : établie sur un autre \
-continent sans aucun lien avec la France, sexe contredit par un intitulé genré du \
-profil, autre société du dirigeant incompatible avec le parcours affiché.
+continent sans aucun lien avec la France, autre société du dirigeant incompatible \
+avec le parcours affiché.
 Un secteur d'activité discordant n'écarte JAMAIS — ni seul, ni combiné à une ville \
 différente : les gens se reconvertissent et déménagent, et juger le projet n'est \
-pas ton rôle. La localisation seule n'est JAMAIS suffisante pour écarter. En \
-l'absence de contradiction, réponds "ok".
+pas ton rôle. La localisation seule n'est JAMAIS suffisante pour écarter. Un \
+intitulé genré du profil (« développeuse », « fondateur ») en désaccord avec le \
+sexe déclaré au greffe n'écarte JAMAIS non plus — ni seul, ni en renfort : ce n'est \
+pas une preuve d'identité (personnes trans ou non-binaires, prénoms épicènes, \
+intitulés imprécis), au mieux une discordance mineure comme la ville. En l'absence \
+de contradiction, réponds "ok".
 
 Si tu réponds "ok" SANS aucun signal corroborant ET avec au moins une discordance \
 (ville personnelle différente, secteur sans rapport), ajoute "doute": true — le \
@@ -117,8 +121,8 @@ def verifier(ligne: dict, contexte: dict) -> dict:
         if ind.get("ville_dirigeant") else None,
         f"Nom d'usage : {ind['nom_usage']}." if ind.get("nom_usage") else None,
         f"Prénom usuel : {ind['prenom_usuel']}." if ind.get("prenom_usuel") else None,
-        # les intitulés français sont genrés (« fondatrice », « développeuse ») :
-        # un désaccord avec le greffe est un signal d'homonyme gratuit
+        # transmis à titre indicatif seulement : le prompt interdit d'écarter
+        # sur un intitulé genré (ce n'est pas une preuve d'identité)
         f"Sexe au greffe : {ind['sexe']}." if ind.get("sexe") else None,
         f"Autres sociétés connues du même dirigeant : "
         f"{', '.join(ind['autres_societes'])}." if ind.get("autres_societes") else None,
