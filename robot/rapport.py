@@ -162,6 +162,10 @@ def main(dossier: str) -> None:
             lignes_anomalies.append(
                 f"- Non vérifié (API indisponible) : {nom_de(v['rec_id'])} — "
                 f"passé au scoring avec Anomalie cochée")
+        elif v.get("requalifie"):
+            lignes_anomalies.append(
+                f"- Écartement requalifié par le garde-fou : {nom_de(v['rec_id'])} "
+                f"({v.get('url')}) — {v.get('raison')} — passé au scoring, mention dans Détail")
     for r in resultats:
         if r["statut"] == "vide":
             f = maj_ix.get(r["rec_id"], {})
